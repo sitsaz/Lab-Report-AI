@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 import { Message } from "../types";
 
@@ -115,10 +116,11 @@ export const sendMessageToGemini = async (
     newCitations?: string[];
     reportUpdates?: UpdateReportAction[];
 }> => {
+  // Always initialize right before use to ensure process.env.API_KEY is available and correct
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const recentHistory = chatHistory.slice(-10).map((msg) => ({
-    role: msg.role,
+    role: msg.role as "user" | "model",
     parts: [{ text: msg.text || (msg.conflict ? `Conflict Resolution: ${msg.conflict.description}` : "") }],
   }));
 

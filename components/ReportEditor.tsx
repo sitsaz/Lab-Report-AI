@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useMemo } from 'react';
-import { Download, FilePenLine, Eye, Bold, Italic, List, Heading, Quote, Code, Split, Table, FileCode } from 'lucide-react';
+import { Download, FilePenLine, Eye, Bold, Italic, List, Heading, Quote, Code, Split, Table as TableIcon, FileCode } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -26,24 +27,17 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
   const fontClass = isRTL ? 'font-persian' : 'font-mono';
   const previewFontClass = isRTL ? 'font-persian' : '';
 
-  // Compute Diff for Preview
   const diffedMarkdown = useMemo(() => {
     if (!originalContent) return content;
-    
-    // We diff the words to find additions
     const changes = diffWords(originalContent, content);
-    
     let result = '';
     changes.forEach((part) => {
         if (part.added) {
-            // Highlighting style for added text
             result += `<span class="bg-indigo-100 text-indigo-800 border-b-2 border-indigo-200 px-0.5 rounded-sm">${part.value}</span>`;
         } else if (!part.removed) {
             result += part.value;
         }
-        // We ignore removed parts to show the current final state with highlights
     });
-    
     return result;
   }, [content, originalContent]);
 
@@ -56,12 +50,10 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
   const generateTableMarkdown = (rows: number, cols: number) => {
     let header = '|';
     let separator = '|';
-    
     for (let i = 1; i <= cols; i++) {
         header += ` Header ${i} |`;
         separator += ` --- |`;
     }
-    
     let body = '';
     for (let r = 1; r <= rows; r++) {
         body += '\n|';
@@ -69,39 +61,34 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
             body += ` Cell ${r}-${c} |`;
         }
     }
-    
     return `\n${header}\n${separator}${body}\n`;
   };
 
   const handleToolbarClick = (action: string) => {
     if (!textareaRef.current) return;
-    
     const textarea = textareaRef.current;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const selection = text.substring(start, end);
-    
     let newText = text;
     let newCursorPos = end;
 
     switch (action) {
       case 'bold':
         newText = text.substring(0, start) + `**${selection}**` + text.substring(end);
-        newCursorPos = end + 4; // **...**
+        newCursorPos = end + 4;
         break;
       case 'italic':
         newText = text.substring(0, start) + `*${selection}*` + text.substring(end);
-        newCursorPos = end + 2; // *...*
+        newCursorPos = end + 2;
         break;
       case 'heading':
-        // Ensure newline before heading if not at start
         const prefix = start > 0 && text[start - 1] !== '\n' ? '\n### ' : '### ';
         newText = text.substring(0, start) + prefix + selection + text.substring(end);
         newCursorPos = start + prefix.length + selection.length;
         break;
       case 'list':
-        // If multiline, add - to each line
         if (selection.includes('\n')) {
              const listified = selection.split('\n').map(l => `- ${l}`).join('\n');
              const pre = start > 0 && text[start - 1] !== '\n' ? '\n' : '';
@@ -126,28 +113,21 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
         const codeBlock = `\`\`\`\n${selection || 'code'}\n\`\`\``;
         const cbPre = start > 0 && text[start - 1] !== '\n' ? '\n' : '';
         newText = text.substring(0, start) + cbPre + codeBlock + text.substring(end);
-        newCursorPos = start + cbPre.length + 4 + (selection.length || 4); // Position inside block
+        newCursorPos = start + cbPre.length + 4 + (selection.length || 4);
         break;
       case 'table':
-        const rowsStr = window.prompt("Number of rows (data rows):", "2");
-        if (rowsStr === null) return; // Cancelled
+        const rowsStr = window.prompt("Number of data rows:", "2");
+        if (rowsStr === null) return;
         const colsStr = window.prompt("Number of columns:", "2");
         if (colsStr === null) return;
-        
-        const rows = parseInt(rowsStr) || 1;
-        const cols = parseInt(colsStr) || 1;
-        
-        const tableTemplate = generateTableMarkdown(rows, cols);
+        const tableTemplate = generateTableMarkdown(parseInt(rowsStr) || 1, parseInt(colsStr) || 1);
         const tblPre = start > 0 && text[start - 1] !== '\n' ? '\n' : '';
         newText = text.substring(0, start) + tblPre + tableTemplate + text.substring(end);
         newCursorPos = start + tblPre.length + tableTemplate.length;
         break;
     }
 
-    // Update content via parent prop
     onChange(newText);
-    
-    // Restore focus and update cursor position
     setTimeout(() => {
         if(textareaRef.current) {
             textareaRef.current.focus();
@@ -159,9 +139,7 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
 
   return (
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Header / Toolbar */}
       <div className="p-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2 min-h-[50px]">
-         {/* Left: File Info */}
         <div className="flex items-center gap-2 pl-2 mr-2">
             <div className="flex flex-col">
                 <span className="font-semibold text-slate-800 text-xs leading-tight">Live Editor</span>
@@ -169,7 +147,6 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
             </div>
         </div>
 
-        {/* Center: Formatting Toolbar */}
         {(viewMode === 'write' || viewMode === 'split') && (
             <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm gap-0.5 overflow-x-auto">
                 <ToolbarButton icon={<Bold className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('bold')} title="Bold" />
@@ -181,51 +158,22 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
                 <div className="w-[1px] h-4 bg-slate-200 mx-1 flex-shrink-0"></div>
                 <ToolbarButton icon={<Code className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('code')} title="Inline Code" />
                 <ToolbarButton icon={<FileCode className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('codeblock')} title="Code Block" />
-                <ToolbarButton icon={<Table className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('table')} title="Insert Table" />
+                <ToolbarButton icon={<TableIcon className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('table')} title="Insert Table" />
             </div>
         )}
 
-        {/* Right: View Toggles & Actions */}
         <div className="flex items-center gap-2 ml-auto">
              <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-                <button 
-                    onClick={() => setViewMode('write')}
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'write' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                    title="Edit Mode"
-                >
-                    <FilePenLine className="w-3.5 h-3.5" />
-                </button>
-                 <button 
-                    onClick={() => setViewMode('split')}
-                    className={`hidden md:block p-1.5 rounded-md transition-all ${viewMode === 'split' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                    title="Split View"
-                >
-                    <Split className="w-3.5 h-3.5" />
-                </button>
-                <button 
-                    onClick={() => setViewMode('preview')}
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'preview' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                    title="Preview Mode"
-                >
-                    <Eye className="w-3.5 h-3.5" />
-                </button>
+                <button onClick={() => setViewMode('write')} className={`p-1.5 rounded-md transition-all ${viewMode === 'write' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`} title="Edit Mode"><FilePenLine className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setViewMode('split')} className={`hidden md:block p-1.5 rounded-md transition-all ${viewMode === 'split' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`} title="Split View"><Split className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setViewMode('preview')} className={`p-1.5 rounded-md transition-all ${viewMode === 'preview' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`} title="Preview Mode"><Eye className="w-3.5 h-3.5" /></button>
              </div>
-             
              <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
-
-             <button 
-                onClick={onDownload}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-            >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Export</span>
-            </button>
+             <button onClick={onDownload} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"><Download className="w-3.5 h-3.5" /><span className="hidden sm:inline">Export</span></button>
         </div>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 relative overflow-hidden flex">
-        {/* Write Pane */}
         {(viewMode === 'write' || viewMode === 'split') && (
             <div className={`h-full relative flex flex-col ${viewMode === 'split' ? 'w-1/2 border-r border-slate-200' : 'w-full'}`}>
                 <textarea
@@ -243,37 +191,20 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
             </div>
         )}
 
-        {/* Preview Pane */}
         {(viewMode === 'preview' || viewMode === 'split') && (
-             <div 
-                className={`h-full overflow-y-auto p-6 bg-slate-50/30 prose prose-sm prose-indigo max-w-none ${viewMode === 'split' ? 'w-1/2' : 'w-full'} ${previewFontClass}`}
-                dir={dir}
-             >
+             <div className={`h-full overflow-y-auto p-6 bg-slate-50/30 prose prose-sm prose-indigo max-w-none ${viewMode === 'split' ? 'w-1/2' : 'w-full'} ${previewFontClass}`} dir={dir}>
                 <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeRaw]}
                     components={{
-                        // Custom table rendering for better aesthetics
                         table: ({node, ...props}) => (
-                            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 shadow-sm">
-                                <table className="min-w-full divide-y divide-slate-200" {...props} />
+                            <div className="overflow-x-auto my-6 rounded-lg border border-slate-300 shadow-md">
+                                <table className="min-w-full divide-y divide-slate-300 bg-white" {...props} />
                             </div>
                         ),
-                        thead: ({node, ...props}) => (
-                            <thead className="bg-slate-50" {...props} />
-                        ),
-                        tbody: ({node, ...props}) => (
-                            <tbody className="bg-white divide-y divide-slate-200" {...props} />
-                        ),
-                        tr: ({node, ...props}) => (
-                            <tr className="even:bg-slate-50/50 hover:bg-slate-100 transition-colors" {...props} />
-                        ),
-                        th: ({node, ...props}) => (
-                            <th className={`px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}`} {...props} />
-                        ),
-                        td: ({node, ...props}) => (
-                            <td className="px-4 py-3 text-sm text-slate-700 whitespace-normal" {...props} />
-                        ),
+                        thead: ({node, ...props}) => (<thead className="bg-slate-100" {...props} />),
+                        th: ({node, ...props}) => (<th className={`px-4 py-3 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-300 ${isRTL ? 'text-right' : 'text-left'}`} {...props} />),
+                        td: ({node, ...props}) => (<td className="px-4 py-3 text-sm text-slate-800 border-b border-slate-200" {...props} />),
                     }}
                 >
                     {diffedMarkdown}
@@ -281,12 +212,8 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
              </div>
         )}
       </div>
-      
-      {/* Footer Info */}
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center">
-        <span>
-            {viewMode === 'write' ? 'Markdown Editor' : viewMode === 'preview' ? 'Preview' : 'Split View'}
-        </span>
+        <span>{viewMode === 'write' ? 'Markdown Editor' : viewMode === 'preview' ? 'Preview' : 'Split View'}</span>
         <span className="font-mono">{content.length} chars</span>
       </div>
     </div>
@@ -294,13 +221,7 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
 };
 
 const ToolbarButton: React.FC<{ icon: React.ReactNode; onClick: () => void; title: string }> = ({ icon, onClick, title }) => (
-    <button 
-        onClick={onClick}
-        className="p-1.5 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 transition-colors"
-        title={title}
-    >
-        {icon}
-    </button>
+    <button onClick={onClick} className="p-1.5 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 transition-colors" title={title}>{icon}</button>
 );
 
 export default ReportEditor;
