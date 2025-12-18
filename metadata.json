@@ -1,0 +1,5 @@
+{
+  "name": "LabReportAI - Intelligent Assistant",
+  "description": "An AI-powered lab report writing assistant that reads your .docx files, conducts web research to fill in missing gaps, and helps you write and export polished reports.",
+  "requestFramePermissions": []
+}

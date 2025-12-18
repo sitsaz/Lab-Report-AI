@@ -1,0 +1,32 @@
+{
+  "name": "labreportai---intelligent-assistant",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.33.0",
+    "uuid": "^13.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.0",
+    "rehype-raw": "^7.0.0",
+    "react": "^19.2.3",
+    "lucide-react": "^0.561.0",
+    "react-dom": "^19.2.3",
+    "mammoth": "^1.11.0",
+    "docx": "^9.5.1",
+    "file-saver": "^2.0.5",
+    "diff": "^5.1.0",
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
