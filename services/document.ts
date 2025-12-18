@@ -1,4 +1,3 @@
-import * as mammoth from 'mammoth';
 import TurndownService from 'turndown';
 import * as turndownGfmNamespace from 'turndown-plugin-gfm';
 import { 
@@ -12,274 +11,302 @@ import {
   TableCell, 
   BorderStyle, 
   WidthType, 
-  ShadingType, 
-  VerticalAlign, 
   AlignmentType,
-  IStylesOptions
+  IStylesOptions,
+  VerticalAlign,
+  HeightRule,
+  TableLayoutType,
+  TableCellMargin
 } from 'docx';
 import FileSaver from 'file-saver';
 
+declare const mammoth: any;
+
 /**
- * Extracts text and formatting from a .docx file using mammoth.
- * Uses a fallback strategy to handle environment-specific buffer expectations.
+ * Aggressively removes characters that are illegal in XML 1.0.
+ * This is crucial for preventing "The file is corrupt" errors in Word.
  */
+const sanitizeString = (str: string | undefined | null): string => {
+  if (str === null || str === undefined) return " ";
+  // Removes control characters except for tab, LF, and CR
+  // Also ensures valid Unicode ranges for XML 1.0
+  return str.replace(/[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD\u10000-\u10FFFF]/g, '');
+};
+
+/**
+ * Removes markdown formatting characters for plain-text insertion into Word runs.
+ */
+const stripMarkdown = (text: string | undefined | null): string => {
+  if (!text) return " ";
+  return text
+    .replace(/[*_~`#]/g, '')
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Simplify links to just text
+    .trim() || " ";
+};
+
+const getSafeText = (text: string | undefined | null): string => {
+  const cleaned = stripMarkdown(text);
+  return sanitizeString(cleaned);
+};
+
+/**
+ * Enhanced Markdown to HTML converter for Google Docs clipboard compatibility.
+ */
+const markdownToHtmlForGDocs = (markdown: string): string => {
+  let html = markdown
+    .replace(/^# (.*$)/gim, '<h1 style="color: #2e74b5; font-family: Arial;">$1</h1>')
+    .replace(/^## (.*$)/gim, '<h2 style="color: #2e74b5; font-family: Arial;">$1</h2>')
+    .replace(/^### (.*$)/gim, '<h3 style="color: #1f4e79; font-family: Arial;">$1</h3>')
+    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+    .replace(/\*(.*)\*/gim, '<i>$1</i>')
+    .replace(/^- (.*$)/gim, '<ul><li>$1</li></ul>')
+    .replace(/<\/ul>\s*<ul>/gim, '') 
+    .replace(/\n/gim, '<br />');
+
+  if (html.includes('|')) {
+    const lines = html.split('<br />');
+    let inTable = false;
+    let tableHtml = '<table border="1" style="border-collapse: collapse; width: 100%; font-family: Arial; font-size: 10pt;">';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('|')) {
+        if (!inTable) inTable = true;
+        const cells = line.split('|').map(c => c.trim()).filter((c, idx, arr) => {
+            // Filter out empty ends
+            if (idx === 0 && c === '') return false;
+            if (idx === arr.length - 1 && c === '') return false;
+            return true;
+        });
+        
+        if (line.includes('---') && line.includes('|')) {
+          lines[i] = ''; 
+          continue; 
+        }
+        
+        tableHtml += '<tr>';
+        cells.forEach(cell => {
+          tableHtml += `<td style="padding: 6px; border: 1px solid #bfbfbf;">${cell || '&nbsp;'}</td>`;
+        });
+        tableHtml += '</tr>';
+        lines[i] = ''; 
+      } else if (inTable) {
+        tableHtml += '</table>';
+        lines[i] = tableHtml + '<br />' + lines[i];
+        inTable = false;
+        tableHtml = '';
+      }
+    }
+    if (inTable) tableHtml += '</table>';
+    html = lines.filter(l => l !== '').join('<br />') + (inTable ? tableHtml : '');
+  }
+
+  return `<div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">${html}</div>`;
+};
+
+export const copyForGoogleDocs = async (markdown: string): Promise<boolean> => {
+  try {
+    const html = markdownToHtmlForGDocs(markdown);
+    const blobHtml = new Blob([html], { type: 'text/html' });
+    const blobText = new Blob([markdown], { type: 'text/plain' });
+    
+    const data = [new ClipboardItem({
+      'text/html': blobHtml,
+      'text/plain': blobText,
+    })];
+
+    await navigator.clipboard.write(data);
+    return true;
+  } catch (err) {
+    console.error("Clipboard export failed:", err);
+    return false;
+  }
+};
+
 export const extractTextFromDocx = async (file: File): Promise<string> => {
   try {
-    console.log(`[DocumentService] Starting extraction: ${file.name} (${file.size} bytes)`);
-    
-    // 1. Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
-    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-      throw new Error("The selected file is empty.");
-    }
-
-    // 2. Quick magic bytes validation (PK ZIP)
-    const view = new Uint8Array(arrayBuffer);
-    if (view[0] !== 0x50 || view[1] !== 0x4B || view[2] !== 0x03 || view[3] !== 0x04) {
-      if (view[0] === 0xD0 && view[1] === 0xCF && view[2] === 0x11 && view[3] === 0xE0) {
-        throw new Error("This is an old .doc file. Please convert it to .docx first.");
-      }
-      throw new Error("This file is not a valid .docx (ZIP signature missing).");
-    }
-
-    // 3. Convert to HTML via mammoth with fallback strategies
-    const mammothLib = (mammoth as any).default || mammoth;
-    let result;
-    
-    try {
-      console.log("[DocumentService] Attempting mammoth.convertToHtml with arrayBuffer...");
-      result = await mammothLib.convertToHtml({ arrayBuffer });
-    } catch (firstError: any) {
-      console.warn("[DocumentService] Primary extraction failed:", firstError.message);
-      
-      // Strategy 2: Use polyfilled Buffer if available
-      if (typeof window !== 'undefined' && (window as any).Buffer) {
-        console.log("[DocumentService] Retrying with Node-style Buffer polyfill...");
-        const buf = (window as any).Buffer.from(arrayBuffer);
-        result = await mammothLib.convertToHtml({ buffer: buf });
-      } else {
-        throw firstError;
-      }
-    }
-
-    if (!result || typeof result.value !== 'string') {
-      throw new Error("Mammoth returned an invalid or empty result.");
-    }
-
-    const html = result.value;
-    console.log(`[DocumentService] HTML conversion successful (${html.length} chars).`);
-    
-    if (result.messages && result.messages.length > 0) {
-      result.messages.forEach((m: any) => console.debug("[Mammoth Msg]", m.message));
-    }
-
-    // 4. Convert HTML to Markdown
-    const turndownService = new TurndownService({
-      headingStyle: 'atx',
-      codeBlockStyle: 'fenced',
-      emDelimiter: '_',
-      strongDelimiter: '**'
-    });
-
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error("File is empty.");
+    const mammothInstance = (window as any).mammoth || mammoth;
+    if (!mammothInstance) throw new Error("Mammoth parser not found.");
+    const result = await mammothInstance.convertToHtml({ arrayBuffer });
+    const turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
     try {
       const ns = turndownGfmNamespace as any;
-      const gfmPlugin = ns.gfm || ns.default?.gfm || ns.default || (typeof ns === 'function' ? ns : null);
-      if (typeof gfmPlugin === 'function') {
-        turndownService.use(gfmPlugin);
-      }
-    } catch (pluginError) {
-      console.warn("[DocumentService] Turndown GFM plugin failed to load:", pluginError);
-    }
-
-    const markdown = turndownService.turndown(html);
-    return markdown;
-
+      const gfm = ns.gfm || ns.default?.gfm || ns.default;
+      if (typeof gfm === 'function') turndownService.use(gfm);
+    } catch (e) {}
+    return turndownService.turndown(result.value);
   } catch (err: any) {
-    console.error("[DocumentService] Critical Extraction Error:", err);
-    
-    // Provide user-friendly messaging for common failures
-    if (err.message && err.message.includes("Could not find main document part")) {
-      throw new Error("Invalid .docx structure: This file is corrupted or not a standard Word document. Try opening it in Word or Google Docs and saving it as a fresh .docx file.");
-    }
-    
-    throw err;
+    throw new Error(err.message || "Extraction failed.");
   }
 };
 
 const docStyles: IStylesOptions = {
   default: {
+    heading1: {
+      run: { size: 32, bold: true, color: "2E74B5", font: "Calibri" },
+      paragraph: { spacing: { before: 240, after: 120 } },
+    },
+    heading2: {
+      run: { size: 26, bold: true, color: "2E74B5", font: "Calibri" },
+      paragraph: { spacing: { before: 120, after: 120 } },
+    },
     document: {
-      run: { font: "Calibri", size: 22, color: "000000" },
+      run: { font: "Calibri", size: 22 },
       paragraph: { spacing: { line: 276, before: 0, after: 120 } },
     },
   },
-  paragraphStyles: [
-    {
-      id: "Heading1",
-      name: "Heading 1",
-      basedOn: "Normal",
-      next: "Normal",
-      quickFormat: true,
-      run: { size: 32, bold: true, color: "2E74B5", font: "Calibri Light" },
-      paragraph: { spacing: { before: 240, after: 120 } },
-    },
-    {
-      id: "Heading2",
-      name: "Heading 2",
-      basedOn: "Normal",
-      next: "Normal",
-      quickFormat: true,
-      run: { size: 26, bold: true, color: "2E74B5", font: "Calibri Light" },
-      paragraph: { spacing: { before: 120, after: 120 } },
-    },
-  ],
 };
 
-const cleanMarkdownText = (text: string): string => {
-    if (!text) return "";
-    let cleaned = text.replace(/<[^>]*>/g, '');
-    cleaned = cleaned
-        .replace(/\*\*/g, '')
-        .replace(/\*/g, '')
-        .replace(/__+/g, '')
-        .replace(/~~/g, '')
-        .replace(/`+([^`]+)`+/g, '$1')
-        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-        .replace(/\\([*#_|[\]()])/g, '$1');
-
-    return cleaned
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/g, "")
-        .trim();
-};
-
-const createTableFromMarkdown = (lines: string[]): Table | null => {
-  const contentLines = lines.filter((line, index) => {
-    if (index === 1 && line.includes('-') && line.includes('|')) return false;
-    return true;
+/**
+ * Robust Markdown table parser for Word.
+ * Ensures consistent column counts and valid OOXML structure.
+ */
+const parseMarkdownTableToDocx = (lines: string[]): Table | null => {
+  // 1. Clean data lines and remove the separator row (|---|---|)
+  const dataLines = lines.filter((line, index) => {
+    const trimmed = line.trim();
+    if (index === 1 && trimmed.includes('-') && trimmed.includes('|')) return false;
+    return trimmed.length > 0;
   });
 
-  if (contentLines.length === 0) return null;
+  if (dataLines.length === 0) return null;
 
-  const rows = contentLines.map((line, rowIndex) => {
-    const rawCells = line.split('|');
-    let cells = rawCells.map(c => c.trim());
-    if (cells[0] === '') cells.shift();
-    if (cells[cells.length - 1] === '') cells.pop();
-    if (cells.length === 0) cells = [" "];
+  // 2. Extract cells more robustly
+  const rawRows = dataLines.map(line => {
+    const rawCells = line.split('|').map(c => c.trim());
+    // Remove the empty elements caused by leading/trailing pipes
+    if (rawCells[0] === '') rawCells.shift();
+    if (rawCells[rawCells.length - 1] === '') rawCells.pop();
+    return rawCells;
+  });
+
+  const maxCols = Math.max(...rawRows.map(r => r.length));
+  if (maxCols === 0) return null;
+
+  // 3. Build TableRows with balanced cells and proper margins
+  const tableRows = rawRows.map((cells, rowIndex) => {
     const isHeader = rowIndex === 0;
+    const balancedCells = [...cells];
+    while (balancedCells.length < maxCols) balancedCells.push(" ");
 
     return new TableRow({
-      children: cells.map(cellText => 
-        new TableCell({
-          children: [new Paragraph({ 
-            children: [
-                new TextRun({
-                    text: cleanMarkdownText(cellText) || " ",
-                    bold: isHeader,
-                    size: isHeader ? 22 : 20,
-                    font: "Calibri"
+      children: balancedCells.map(cellText => {
+        const safeContent = getSafeText(cellText);
+        return new TableCell({
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: safeContent || " ", // Guaranteed non-empty for Word stability
+                  bold: isHeader, 
+                  size: isHeader ? 22 : 20 
                 })
-            ],
-            alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT
-          })],
-          shading: { fill: isHeader ? "F2F2F2" : "FFFFFF", type: ShadingType.CLEAR },
-          borders: {
-            top: { style: BorderStyle.SINGLE, size: 4, color: "A6A6A6" },
-            bottom: { style: BorderStyle.SINGLE, size: 4, color: "A6A6A6" },
-            left: { style: BorderStyle.SINGLE, size: 4, color: "A6A6A6" },
-            right: { style: BorderStyle.SINGLE, size: 4, color: "A6A6A6" },
-          },
+              ],
+              alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+              spacing: { before: 100, after: 100 }
+            })
+          ],
+          shading: { fill: isHeader ? "F2F2F2" : "FFFFFF" },
           verticalAlign: VerticalAlign.CENTER,
-          width: { size: Math.max(1, 100 / cells.length), type: WidthType.PERCENTAGE },
-          margins: { top: 80, bottom: 80, left: 100, right: 100 }
-        })
-      ),
+          margins: {
+            top: 100,
+            bottom: 100,
+            left: 100,
+            right: 100,
+          },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 1, color: "BFBFBF" },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: "BFBFBF" },
+            left: { style: BorderStyle.SINGLE, size: 1, color: "BFBFBF" },
+            right: { style: BorderStyle.SINGLE, size: 1, color: "BFBFBF" },
+          },
+          width: { size: 100 / maxCols, type: WidthType.PERCENTAGE },
+        });
+      }),
     });
   });
 
   return new Table({
-    rows: rows,
+    rows: tableRows,
     width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 2, color: "777777" },
+      bottom: { style: BorderStyle.SINGLE, size: 2, color: "777777" },
+      left: { style: BorderStyle.SINGLE, size: 2, color: "777777" },
+      right: { style: BorderStyle.SINGLE, size: 2, color: "777777" },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "BFBFBF" },
+      insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "BFBFBF" },
+    }
   });
 };
 
 export const saveTextToDocx = async (text: string, filename: string) => {
-  if (!text) {
-      alert("Cannot export an empty report.");
-      return;
-  }
-
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   const children: (Paragraph | Table)[] = [];
-  
   let i = 0;
+
   while (i < lines.length) {
     const line = lines[i].trim();
-    if (line === "") {
+    
+    // 1. Handle Empty Lines
+    if (!line) {
+      children.push(new Paragraph({ 
+        children: [new TextRun("")],
+        spacing: { after: 120 }
+      }));
+      i++;
+      continue;
+    }
+
+    // 2. Handle Tables
+    // Look for a markdown table start
+    if (line.startsWith('|') && i + 1 < lines.length && lines[i+1].includes('|') && lines[i+1].includes('-')) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+      const table = parseMarkdownTableToDocx(tableLines);
+      if (table) {
+        children.push(table);
+        // Add a blank paragraph for spacing after the table
         children.push(new Paragraph({ children: [new TextRun("")] }));
-        i++;
-        continue;
+      }
+      continue;
     }
 
-    const isTableRow = (l: string) => l.includes('|');
-    if (isTableRow(line)) {
-        const hasNext = i + 1 < lines.length;
-        const nextLine = hasNext ? lines[i+1].trim() : "";
-        
-        if (hasNext && nextLine.includes('|') && nextLine.match(/^[| \-:]+$/)) {
-            const tableLines: string[] = [];
-            while (i < lines.length && isTableRow(lines[i])) {
-                tableLines.push(lines[i].trim());
-                i++;
-            }
-            if (tableLines.length > 0) {
-                try {
-                    const tableObj = createTableFromMarkdown(tableLines);
-                    if (tableObj) {
-                        children.push(tableObj);
-                        children.push(new Paragraph({ children: [new TextRun("")] })); 
-                    }
-                } catch (err) {
-                    console.error("Failed to parse table:", err);
-                    tableLines.forEach(tl => {
-                        children.push(new Paragraph({ children: [new TextRun(cleanMarkdownText(tl))] }));
-                    });
-                }
-            }
-            continue;
-        }
-    }
-
-    const cleanLine = cleanMarkdownText(line);
-    if (!cleanLine) {
-        i++;
-        continue;
-    }
-
+    // 3. Handle Headings
     if (line.startsWith('# ')) {
-        children.push(new Paragraph({
-            text: cleanLine.replace(/^#\s+/, ''),
-            heading: HeadingLevel.HEADING_1,
-        }));
+      children.push(new Paragraph({ 
+        children: [new TextRun({ text: sanitizeString(line.replace(/^#\s+/, '')) })], 
+        heading: HeadingLevel.HEADING_1 
+      }));
     } else if (line.startsWith('## ')) {
-        children.push(new Paragraph({
-            text: cleanLine.replace(/^##\s+/, ''),
-            heading: HeadingLevel.HEADING_2,
-        }));
+      children.push(new Paragraph({ 
+        children: [new TextRun({ text: sanitizeString(line.replace(/^##\s+/, '')) })], 
+        heading: HeadingLevel.HEADING_2 
+      }));
     } else if (line.startsWith('### ')) {
-        children.push(new Paragraph({
-            text: cleanLine.replace(/^###\s+/, ''),
-            heading: HeadingLevel.HEADING_3,
-        }));
-    } else if (line.startsWith('- ') || line.startsWith('* ')) {
-        children.push(new Paragraph({
-            text: cleanLine.replace(/^[-*]\s+/, ''),
-            bullet: { level: 0 },
-        }));
-    } else {
-        children.push(new Paragraph({
-            children: [new TextRun({ text: cleanLine })],
-        }));
+      children.push(new Paragraph({ 
+        children: [new TextRun({ text: sanitizeString(line.replace(/^###\s+/, '')) })], 
+        heading: HeadingLevel.HEADING_3 
+      }));
+    } 
+    // 4. Handle Lists
+    else if (line.startsWith('- ') || line.startsWith('* ')) {
+      children.push(new Paragraph({ 
+        children: [new TextRun({ text: getSafeText(line.substring(2)) })], 
+        bullet: { level: 0 } 
+      }));
+    } 
+    // 5. Normal text
+    else {
+      children.push(new Paragraph({ 
+        children: [new TextRun({ text: getSafeText(line) })] 
+      }));
     }
     i++;
   }
@@ -288,17 +315,18 @@ export const saveTextToDocx = async (text: string, filename: string) => {
     const doc = new Document({
       styles: docStyles,
       sections: [{
-        properties: {},
-        children: children.length > 0 ? children : [new Paragraph({ text: "Lab Report Content" })],
+        properties: { 
+          page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } 
+        },
+        children: children.length > 0 ? children : [new Paragraph({ children: [new TextRun(" ")] })],
       }],
     });
 
     const blob = await Packer.toBlob(doc);
-    const safeFilename = filename.replace(/[<>:"/\\|?*]/g, '_');
-    const finalFilename = safeFilename.endsWith('.docx') ? safeFilename : `${safeFilename}.docx`;
-    FileSaver.saveAs(blob, finalFilename);
-  } catch (error) {
-    console.error("Failed to generate .docx blob:", error);
-    alert("An error occurred while generating the document.");
+    const safeName = filename.replace(/[<>:"/\\|?*]/g, '_').replace(/\.docx$/, '') + ".docx";
+    FileSaver.saveAs(blob, safeName);
+  } catch (err) {
+    console.error("DOCX Export Error:", err);
+    alert("Export Failed: An error occurred while building the Word document. Please check the console for details.");
   }
 };
