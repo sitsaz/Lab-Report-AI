@@ -9,9 +9,17 @@ import ConflictManager from './components/ConflictManager';
 import { extractTextFromDocx, saveTextToDocx } from './services/document.ts';
 import { sendMessageToGemini, generateCitation } from './services/gemini.ts';
 import { Message, AppState, ReportFile, Task, Citation } from './types';
-import { Beaker, ArrowLeft, Key, Languages, BookOpen, AlertTriangle, MessageSquare, ListTodo, History, Info } from 'lucide-react';
+import { Beaker, ArrowLeft, Key, Languages, BookOpen, AlertTriangle, MessageSquare, ListTodo, History, Info, Loader2 } from 'lucide-react';
 
 const STORAGE_KEY = 'LAB_REPORT_SESSION_V2';
+
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+  }
+};
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -38,7 +46,6 @@ const App: React.FC = () => {
     }
   }, [unresolvedConflicts.length]);
 
-  // Autosave setup
   useEffect(() => {
     const intervalId = setInterval(() => {
       const { currentFile: f, messages: m, tasks: t, citations: c, language: l } = stateRef.current;
@@ -47,7 +54,7 @@ const App: React.FC = () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
         setLastSaved(new Date());
       }
-    }, 15000); // More frequent autosave for safety
+    }, 15000);
 
     return () => clearInterval(intervalId);
   }, []);
@@ -58,7 +65,11 @@ const App: React.FC = () => {
       try {
         const data = JSON.parse(savedData);
         setCurrentFile(data.file);
-        setMessages(data.messages || []);
+        const restoredMessages = (data.messages || []).map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+        setMessages(restoredMessages);
         setTasks(data.tasks || []);
         setCitations(data.citations || []);
         setLanguage(data.language || 'en');
@@ -70,9 +81,12 @@ const App: React.FC = () => {
   };
 
   const handleFileSelect = async (file: File) => {
+    console.log("App: handleFileSelect called for", file.name);
     setAppState(AppState.PROCESSING);
     try {
       const text = await extractTextFromDocx(file);
+      console.log("App: Extraction successful.");
+      
       setCurrentFile({
         name: file.name,
         content: text,
@@ -81,19 +95,20 @@ const App: React.FC = () => {
       });
       setMessages([
         {
-          id: crypto.randomUUID(),
+          id: generateId(),
           role: 'model',
           text: `I've successfully read **${file.name}**. \n\nYou can see the content and its tables on the right in the preview pane.`,
           timestamp: new Date(),
         },
       ]);
       setTasks([
-        { id: crypto.randomUUID(), text: 'Review abstract', completed: false },
-        { id: crypto.randomUUID(), text: 'Check data accuracy', completed: false }
+        { id: generateId(), text: 'Review abstract', completed: false },
+        { id: generateId(), text: 'Check data accuracy', completed: false }
       ]);
       setAppState(AppState.IDLE);
-    } catch (error) {
-      alert("Error reading file. Ensure it is a valid .docx document.");
+    } catch (error: any) {
+      console.error("App: Extraction failed:", error);
+      alert(`Error reading file "${file.name}": ${error.message || 'Unknown error'}`);
       setAppState(AppState.ERROR);
     }
   };
@@ -131,16 +146,16 @@ const App: React.FC = () => {
 
       const newMessages: Message[] = [];
       if (responseText) {
-        newMessages.push({ id: crypto.randomUUID(), role: 'model', text: responseText, sources, timestamp: new Date() });
+        newMessages.push({ id: generateId(), role: 'model', text: responseText, sources, timestamp: new Date() });
       }
       if (conflicts && conflicts.length > 0) {
         conflicts.forEach(c => {
-          newMessages.push({ id: crypto.randomUUID(), role: 'model', text: '', conflict: { ...c, resolved: false }, timestamp: new Date() });
+          newMessages.push({ id: generateId(), role: 'model', text: '', conflict: { ...c, resolved: false }, timestamp: new Date() });
         });
       }
       setMessages((prev) => [...prev, ...newMessages]);
     } catch (error) {
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'model', text: "An error occurred with the AI connection.", timestamp: new Date() }]);
+      setMessages((prev) => [...prev, { id: generateId(), role: 'model', text: "An error occurred with the AI connection.", timestamp: new Date() }]);
     } finally {
       setAppState(AppState.IDLE);
     }
@@ -149,7 +164,7 @@ const App: React.FC = () => {
   const handleAddCitation = async (source: string, style: 'APA' | 'IEEE' | 'MLA' = 'APA') => {
     try {
       const { formatted, inText } = await generateCitation(source, style);
-      const newCitation: Citation = { id: crypto.randomUUID(), source, formatted, inText, style };
+      const newCitation: Citation = { id: generateId(), source, formatted, inText, style };
       setCitations(prev => prev.some(c => c.source === source) ? prev : [...prev, newCitation]);
     } catch (e) {
       console.error(e);
@@ -157,17 +172,15 @@ const App: React.FC = () => {
   };
 
   const handleSendMessage = async (text: string) => {
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text, timestamp: new Date() };
+    const userMsg: Message = { id: generateId(), role: 'user', text, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     await processAIResponse(text, [...messages, userMsg]);
   };
 
-  // Fixed missing handleDeleteCitation: Filters the citations list to remove a specific item
   const handleDeleteCitation = (id: string) => {
     setCitations(prev => prev.filter(c => c.id !== id));
   };
 
-  // Fixed missing handleInsertToDoc: Inserts generated citation text into the document at the last known cursor position
   const handleInsertToDoc = (textToInsert: string) => {
     if (!currentFile) return;
     const { content } = currentFile;
@@ -176,14 +189,12 @@ const App: React.FC = () => {
     setCursorPosition(cursorPosition + textToInsert.length);
   };
 
-  // Fixed missing handleContentChange: Updates the document content state when edited in the UI
   const handleContentChange = (newContent: string) => {
     if (currentFile) {
       setCurrentFile({ ...currentFile, content: newContent });
     }
   };
 
-  // Fixed missing handleDownload: Triggers the .docx generation and download process
   const handleDownload = async () => {
     if (currentFile) {
       await saveTextToDocx(currentFile.content, currentFile.name);
@@ -252,6 +263,14 @@ const App: React.FC = () => {
           <p className="text-lg text-slate-500">Upload your report to start writing, researching, and fixing formatting.</p>
         </div>
         <FileUploader onFileSelect={handleFileSelect} isProcessing={appState === AppState.PROCESSING} />
+        
+        {appState === AppState.PROCESSING && (
+           <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+              <p className="text-lg font-bold text-slate-700">Converting Document...</p>
+              <p className="text-sm text-slate-500">This may take a moment for large files.</p>
+           </div>
+        )}
       </div>
     );
   }
@@ -297,7 +316,7 @@ const App: React.FC = () => {
               <ChatInterface messages={messages} onSendMessage={handleSendMessage} onResolveConflict={(mid, res) => handleBulkResolveConflicts({[mid]: res})} onAddCitation={(source) => handleAddCitation(source, 'APA')} isProcessing={appState === AppState.PROCESSING} language={language} />
             </div>
             <div className={`absolute inset-0 flex flex-col transition-opacity ${activeTab === 'tasks' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'}`}>
-              <TaskManager tasks={tasks} onAddTask={text => setTasks(prev => [...prev, {id: crypto.randomUUID(), text, completed: false}])} onToggleTask={id => setTasks(prev => prev.map(t => t.id === id ? {...t, completed: !t.completed} : t))} onDeleteTask={id => setTasks(prev => prev.filter(t => t.id !== id))} />
+              <TaskManager tasks={tasks} onAddTask={text => setTasks(prev => [...prev, {id: generateId(), text, completed: false}])} onToggleTask={id => setTasks(prev => prev.map(t => t.id === id ? {...t, completed: !t.completed} : t))} onDeleteTask={id => setTasks(prev => prev.filter(t => t.id !== id))} />
             </div>
             <div className={`absolute inset-0 flex flex-col transition-opacity ${activeTab === 'citations' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'}`}>
               <CitationManager citations={citations} onAddCitation={handleAddCitation} onDeleteCitation={handleDeleteCitation} onInsertToDoc={handleInsertToDoc} isProcessing={appState === AppState.PROCESSING} />

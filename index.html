@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -7,6 +6,61 @@
     <title>LabReportAI</title>
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
+    <!-- Load Buffer polyfill early -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <script>
+      // 1. Establish 'global' and 'globalThis' aliases early
+      window.global = window;
+      
+      // 2. Initialize 'process' with comprehensive mock properties
+      if (typeof window.process === 'undefined') {
+        window.process = {
+          env: { NODE_ENV: 'production' },
+          browser: true,
+          nextTick: (fn) => setTimeout(fn, 0),
+          cwd: () => '/',
+          version: 'v16.0.0',
+          versions: {},
+          platform: 'browser',
+          on: () => {},
+          once: () => {},
+          off: () => {},
+          emit: () => {},
+          listeners: () => [],
+          binding: (name) => { return undefined; }
+        };
+      }
+
+      // 3. Ensure Buffer is available globally and on window
+      // The CDN script usually sets window.Buffer or a global 'buffer'
+      if (typeof window.Buffer === 'undefined') {
+        if (typeof buffer !== 'undefined' && buffer.Buffer) {
+          window.Buffer = buffer.Buffer;
+        } else {
+          console.warn("Buffer polyfill did not initialize as expected. Manual fallback triggered.");
+          // Minimal fallback to avoid crashes, though conversion might fail
+          window.Buffer = {
+            isBuffer: () => false,
+            from: (data) => new Uint8Array(data)
+          };
+        }
+      }
+
+      // 4. Util polyfill for older dependencies
+      window.util = window.util || {
+        inspect: { colors: {} },
+        debuglog: () => () => {},
+        deprecate: (fn) => fn,
+        format: (...args) => args.join(' '),
+        inherits: (ctor, superCtor) => {
+          if (superCtor) {
+            ctor.super_ = superCtor;
+            Object.setPrototypeOf(ctor.prototype, superCtor.prototype);
+          }
+        },
+        _extend: (target, source) => Object.assign(target, source)
+      };
+    </script>
     <style>
       /* Custom scrollbar for a cleaner look */
       ::-webkit-scrollbar {
@@ -41,7 +95,7 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react-dom": "https://esm.sh/react-dom@^19.2.3",
     "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
-    "mammoth": "https://esm.sh/mammoth@^1.11.0",
+    "mammoth": "https://esm.sh/mammoth@1.8.0",
     "docx": "https://esm.sh/docx@^9.5.1",
     "file-saver": "https://esm.sh/file-saver@^2.0.5",
     "diff": "https://esm.sh/diff@^5.1.0",
