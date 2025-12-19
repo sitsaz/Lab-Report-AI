@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Bot, User, Globe, ExternalLink, AlertTriangle, Check, Info, Paperclip, PlusCircle, Shield, Layers, RefreshCw } from 'lucide-react';
+import { Send, Bot, User, Globe, ExternalLink, AlertTriangle, Check, Info, Paperclip, PlusCircle, Shield, Layers, RefreshCw, Sparkles, Cpu, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Message } from '../types';
@@ -7,7 +7,6 @@ import { Message } from '../types';
 interface ChatInterfaceProps {
   messages: Message[];
   onSendMessage: (text: string) => void;
-  // onCompareData removed as it is now automatic
   onResolveConflict: (messageId: string, resolution: 'kept_existing' | 'updated_new' | 'combined') => void;
   onFileUpload?: (file: File) => void;
   onAddCitation?: (source: string) => void;
@@ -40,47 +39,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
     }
   };
 
-  const handleFileIconClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-        if (onFileUpload) {
-            onFileUpload(e.target.files[0]);
-        }
-        // Reset input so same file can be selected again if needed
-        e.target.value = '';
-    }
-  };
-
   return (
     <div className={`flex flex-col h-full bg-white overflow-hidden ${fontClass}`}>
-      {/* Header */}
-      <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-            <div className="p-1 bg-indigo-100 rounded-lg">
-                 <Bot className="w-4 h-4 text-indigo-600" />
-            </div>
-            <h2 className="font-semibold text-slate-800 text-sm">
-                {isRTL ? 'دستیار هوشمند' : 'Research Assistant'}
-            </h2>
-        </div>
-        <div className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 tracking-wide">
-            Gemini
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/20">
         {messages.length === 0 && (
           <div className="text-center text-slate-400 mt-10">
-            <p className="mb-2">👋 {isRTL ? 'سلام! من دستیار آزمایشگاه شما هستم.' : "Hi! I'm your lab assistant."}</p>
-            <p className="text-sm">
-                {isRTL 
-                    ? 'گزارش خود را بارگذاری کنید تا شروع کنیم.' 
-                    : 'Upload a report to get started. I will automatically detect any conflicts if you provide contradictory data.'}
-            </p>
+            <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-200">
+               <Bot className="w-8 h-8 text-slate-300" />
+            </div>
+            <p className="font-black text-slate-600 uppercase tracking-tighter mb-1">Session Inactive</p>
+            <p className="text-xs text-slate-400">Ask a question to start the scientific inquiry.</p>
           </div>
         )}
         
@@ -90,118 +58,68 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${
+              className={`max-w-[90%] rounded-2xl p-4 shadow-sm border transition-all ${
                 msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-none'
-                  : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none'
+                  ? 'bg-slate-900 text-white border-slate-800 rounded-br-none'
+                  : 'bg-white border-slate-200 text-slate-800 rounded-bl-none'
               }`}
               dir="auto"
             >
-              <div className="flex items-center gap-2 mb-1 opacity-75 text-xs">
-                {msg.role === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
-                <span className="capitalize font-medium">
-                    {msg.role === 'model' 
-                        ? (isRTL ? 'دستیار' : 'Assistant') 
-                        : (isRTL ? 'شما' : 'You')}
-                </span>
+              <div className="flex items-center justify-between gap-4 mb-2">
+                <div className="flex items-center gap-1.5 opacity-60 text-[10px] font-black uppercase tracking-widest">
+                  {msg.role === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
+                  <span>{msg.role === 'model' ? (isRTL ? 'دستیار' : 'Assistant') : (isRTL ? 'شما' : 'User')}</span>
+                </div>
+                {msg.role === 'model' && msg.provider && (
+                  <div className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase ${
+                    msg.provider === 'gemini' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                    msg.provider === 'openai' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                    msg.provider === 'avalai' ? 'bg-cyan-50 text-cyan-600 border-cyan-100' :
+                    'bg-amber-50 text-amber-600 border-amber-100'
+                  }`}>
+                    {msg.provider}
+                  </div>
+                )}
               </div>
               
-              <div className="prose prose-sm prose-invert-only max-w-none">
+              <div className="prose prose-sm prose-invert-only max-w-none text-sm leading-relaxed font-medium">
                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
               </div>
 
-              {/* Conflict Resolution UI */}
+              {/* Conflict UI - Redesigned */}
               {msg.conflict && !msg.conflict.resolved && (
-                <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                    <div className="bg-amber-50/60 border-b border-amber-100 p-3 flex items-start gap-2.5">
-                         <div className="p-1 bg-amber-100 rounded text-amber-600">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                         </div>
-                         <div>
-                             <p className="text-xs font-bold text-slate-800">{msg.conflict.description}</p>
-                             {msg.conflict.reasoning && (
-                                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{msg.conflict.reasoning}</p>
-                             )}
-                         </div>
+                <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="p-3 border-b border-slate-200 flex items-center gap-2 bg-white">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-black uppercase tracking-tight">{msg.conflict.description}</span>
                     </div>
-                    
-                    <div className="p-3 grid gap-3">
-                         <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Original</span>
-                            <p className="text-xs text-slate-700">{msg.conflict.existing_info}</p>
-                         </div>
-                         <div className="bg-indigo-50/50 rounded-lg p-2 border border-indigo-100">
-                            <span className="text-[10px] font-bold text-indigo-400 uppercase block mb-1">New Input</span>
-                            <p className="text-xs text-slate-800 font-medium">{msg.conflict.new_info}</p>
-                         </div>
+                    <div className="p-3 grid gap-2">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">Discrepancy:</div>
+                        <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs leading-relaxed italic text-slate-600">
+                           {msg.conflict.reasoning}
+                        </div>
                     </div>
-
-                    <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100">
-                         <button
-                            onClick={() => onResolveConflict(msg.id, 'kept_existing')}
-                            className="py-2.5 px-2 hover:bg-slate-50 flex flex-col items-center gap-1 transition-colors group"
-                         >
-                             <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
-                             <span className="text-[10px] font-medium text-slate-500 group-hover:text-slate-700">Discard</span>
-                         </button>
-                         <button
-                            onClick={() => onResolveConflict(msg.id, 'combined')}
-                            className="py-2.5 px-2 hover:bg-amber-50 flex flex-col items-center gap-1 transition-colors group"
-                         >
-                             <Layers className="w-3.5 h-3.5 text-amber-500 group-hover:text-amber-600" />
-                             <span className="text-[10px] font-medium text-amber-600 group-hover:text-amber-700">Merge</span>
-                         </button>
-                         <button
-                            onClick={() => onResolveConflict(msg.id, 'updated_new')}
-                            className="py-2.5 px-2 hover:bg-indigo-50 flex flex-col items-center gap-1 transition-colors group"
-                         >
-                             <RefreshCw className="w-3.5 h-3.5 text-indigo-500 group-hover:text-indigo-600" />
-                             <span className="text-[10px] font-medium text-indigo-600 group-hover:text-indigo-700">Overwrite</span>
-                         </button>
+                    <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
+                         <button onClick={() => onResolveConflict(msg.id, 'kept_existing')} className="py-3 px-1 text-[10px] font-black uppercase text-slate-500 hover:bg-white hover:text-slate-900 transition-all">Keep</button>
+                         <button onClick={() => onResolveConflict(msg.id, 'combined')} className="py-3 px-1 text-[10px] font-black uppercase text-amber-600 hover:bg-amber-50 transition-all">Merge</button>
+                         <button onClick={() => onResolveConflict(msg.id, 'updated_new')} className="py-3 px-1 text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-50 transition-all">Replace</button>
                     </div>
                 </div>
               )}
 
-              {/* Resolved Conflict State */}
-              {msg.conflict && msg.conflict.resolved && (
-                  <div className="mt-3 p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2 text-xs text-slate-500">
-                      <Check className="w-3.5 h-3.5 text-green-500" />
-                      <span>
-                          {msg.conflict.resolution === 'updated_new' && 'Updated report.'}
-                          {msg.conflict.resolution === 'kept_existing' && 'Kept original.'}
-                          {msg.conflict.resolution === 'combined' && 'Merged info.'}
-                      </span>
-                  </div>
-              )}
-
-              {/* Sources */}
               {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-slate-100/20">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold mb-2 opacity-90">
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
                         <Globe className="w-3 h-3" />
-                        <span>Sources (Web)</span>
+                        <span>Research references</span>
                     </div>
-                    <ul className="space-y-1">
+                    <ul className="grid gap-1.5">
                         {msg.sources.map((source, idx) => (
-                            <li key={idx} className="flex items-center justify-between gap-2 group/source bg-white/50 p-1 rounded hover:bg-white/80 transition-colors">
-                                <a 
-                                    href={source.uri} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className={`text-xs flex items-center gap-1 hover:underline truncate max-w-full flex-1 ${msg.role === 'user' ? 'text-indigo-100' : 'text-blue-600'}`}
-                                >
-                                    <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                            <li key={idx} className="flex items-center justify-between group bg-slate-50 border border-slate-100 p-1.5 rounded-lg">
+                                <a href={source.uri} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-indigo-600 hover:underline truncate max-w-[200px]">
                                     {source.title || source.uri}
                                 </a>
-                                {onAddCitation && (
-                                    <button 
-                                        onClick={() => onAddCitation(source.uri)}
-                                        className="text-slate-400 hover:text-indigo-600 opacity-0 group-hover/source:opacity-100 transition-all p-1"
-                                        title="Add to Citations Manager"
-                                    >
-                                        <PlusCircle className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
+                                <ExternalLink className="w-2.5 h-2.5 text-slate-300" />
                             </li>
                         ))}
                     </ul>
@@ -210,63 +128,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             </div>
           </div>
         ))}
-        {isProcessing && (
-           <div className="flex justify-start">
-             <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-none p-4 shadow-sm flex items-center gap-2">
-                <Bot className="w-4 h-4 text-indigo-600 animate-pulse" />
-                <span className="text-sm text-slate-500 animate-pulse">
-                    {isRTL ? 'در حال بررسی...' : 'Researching and writing...'}
-                </span>
-             </div>
-           </div>
-        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 bg-white border-t border-slate-100">
-        <form onSubmit={handleSubmit} className="relative">
-          {/* File Upload Input */}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept=".docx" 
-            className="hidden" 
-          />
-          
-          <input
-            type="text"
-            dir={dir}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={isRTL ? 'سوال خود را بپرسید...' : 'Ask to find papers, constants, or fill gaps...'}
-            className={`w-full border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm py-3 bg-slate-50 border-slate-200 placeholder:text-slate-400 ${isRTL ? 'pr-12 pl-12' : 'pl-12 pr-12'}`}
-            disabled={isProcessing}
-          />
-          
-          {/* Left Icon (Upload) */}
-          <div className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1 ${isRTL ? 'right-2' : 'left-2'}`}>
-              <button
-                type="button"
-                onClick={handleFileIconClick}
-                disabled={isProcessing}
-                className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
-                title="Upload .docx as input"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-          </div>
-
-          {/* Right Icon (Send) */}
-          <div className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1 ${isRTL ? 'left-2' : 'right-2'}`}>
-              <button
+      <div className="p-4 bg-white border-t border-slate-200">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              dir={dir}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={isRTL ? 'دستور خود را بنویسید...' : 'Ask for research, verification, or edits...'}
+              className={`w-full border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all text-sm py-3.5 ${isRTL ? 'pr-4 pl-12' : 'pl-4 pr-12'} font-medium bg-slate-50/50`}
+              disabled={isProcessing}
+            />
+            <button
                 type="submit"
                 disabled={!input.trim() || isProcessing}
-                className="p-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'left-2' : 'right-2'} p-2 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-30 disabled:scale-95 transition-all shadow-lg shadow-indigo-100`}
               >
-                <Send className="w-4 h-4" />
-              </button>
+                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
           </div>
         </form>
       </div>

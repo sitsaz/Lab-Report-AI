@@ -1,13 +1,16 @@
+export type AIProvider = 'gemini' | 'openai' | 'openrouter' | 'avalai';
+
 export interface Message {
   id: string;
   role: 'user' | 'model';
   text: string;
+  provider?: AIProvider;
   sources?: { title?: string; uri: string }[];
   conflict?: {
     existing_info: string;
     new_info: string;
     description: string;
-    reasoning?: string; // Detailed explanation
+    reasoning?: string;
     resolved?: boolean;
     resolution?: 'kept_existing' | 'updated_new' | 'combined';
   };
@@ -16,8 +19,8 @@ export interface Message {
 
 export interface ReportFile {
   name: string;
-  content: string; // Current edited content
-  originalContent: string; // Baseline content for diffing
+  content: string;
+  originalContent: string;
   lastModified: number;
 }
 
@@ -29,10 +32,19 @@ export interface Task {
 
 export interface Citation {
   id: string;
-  source: string; // URL or Title
-  formatted: string; // The full bibliography entry
-  inText: string; // The in-text marker e.g. (Smith, 2023) or [1]
+  source: string;
+  formatted: string;
+  inText: string;
   style: 'APA' | 'IEEE' | 'MLA';
+}
+
+export interface UsageStats {
+  requestsInLastMinute: number;
+  totalRequests: number;
+  dailyRequestsCount: number;
+  totalTokens: number;
+  requestTimestamps: number[];
+  lastResetDate: string;
 }
 
 export enum AppState {
