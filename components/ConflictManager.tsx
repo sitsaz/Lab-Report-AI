@@ -1,7 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-// Added missing Info icon to the lucide-react import list
-import { AlertTriangle, Layers, RefreshCw, Shield, Save, CheckCircle2, FileText, Sparkles, Check, Loader2, ArrowDown, Info } from 'lucide-react';
+import { 
+  AlertTriangle, 
+  Layers, 
+  RefreshCw, 
+  Shield, 
+  Save, 
+  CheckCircle2, 
+  FileText, 
+  Sparkles, 
+  Check, 
+  Loader2, 
+  ArrowDown, 
+  Info,
+  History,
+  Cpu,
+  Database,
+  SearchCode
+} from 'lucide-react';
 import { Message } from '../types';
 
 interface ConflictManagerProps {
@@ -27,7 +43,6 @@ const ConflictManager: React.FC<ConflictManagerProps> = ({ conflicts, onBulkReso
 
   const handleFinalSubmit = async () => {
     setIsSubmitting(true);
-    // Visual feedback delay
     await new Promise(resolve => setTimeout(resolve, 800));
     setShowSuccess(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -59,7 +74,7 @@ const ConflictManager: React.FC<ConflictManagerProps> = ({ conflicts, onBulkReso
   }
 
   return (
-    <div className={`flex flex-col h-full bg-slate-50/50 ${isRTL ? 'font-persian' : ''}`} dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className={`flex flex-col h-full bg-slate-100/30 ${isRTL ? 'font-persian' : ''}`} dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="p-4 border-b border-slate-200 bg-white shadow-sm sticky top-0 z-20">
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2.5 font-bold text-slate-800">
@@ -67,19 +82,19 @@ const ConflictManager: React.FC<ConflictManagerProps> = ({ conflicts, onBulkReso
                         <AlertTriangle className="w-4.5 h-4.5 text-amber-600" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="leading-none">{isRTL ? 'مرکز مدیریت تضادها' : 'Conflict Resolution'}</span>
-                        <span className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-widest">Scientific Audit</span>
+                        <span className="leading-none">{isRTL ? 'مرکز مدیریت تضادها' : 'Conflict Resolution Hub'}</span>
+                        <span className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-widest">Verify & Harmonize Data</span>
                     </div>
                 </div>
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 shadow-sm">
-                        {conflicts.length} {isRTL ? 'مورد باقی‌مانده' : 'Issues Pending'}
+                        {conflicts.length} {isRTL ? 'مورد باقی‌مانده' : 'Pending Review'}
                     </span>
                 </div>
             </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-24">
+        <div className="flex-1 overflow-y-auto p-4 space-y-12 pb-24">
             {conflicts.map((msg, index) => {
                 if (!msg.conflict) return null;
                 const currentSelection = selections[msg.id];
@@ -87,123 +102,136 @@ const ConflictManager: React.FC<ConflictManagerProps> = ({ conflicts, onBulkReso
                 return (
                     <div 
                         key={msg.id} 
-                        className={`group relative bg-white border rounded-2xl shadow-sm transition-all duration-500 ease-out flex flex-col ${
+                        className={`group relative bg-white border rounded-3xl transition-all duration-500 ease-out flex flex-col ${
                             currentSelection 
-                            ? 'border-indigo-500 ring-4 ring-indigo-50 shadow-lg transform scale-[1.02] -translate-y-1' 
-                            : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                            ? 'border-indigo-500 ring-8 ring-indigo-50/50 shadow-2xl transform scale-[1.02] -translate-y-1' 
+                            : 'border-slate-200 hover:border-slate-300 shadow-lg'
                         }`}
                     >
                         {/* Status Badge */}
                         {currentSelection && (
-                            <div className="absolute -top-3 -right-3 bg-indigo-600 text-white p-1.5 rounded-full shadow-lg z-10 animate-in zoom-in duration-300">
-                                <Check className="w-4 h-4 stroke-[3]" />
+                            <div className="absolute -top-3 -right-3 bg-indigo-600 text-white p-2 rounded-full shadow-lg z-10 animate-in zoom-in duration-300">
+                                <Check className="w-5 h-5 stroke-[3]" />
                             </div>
                         )}
 
                         {/* Card Header */}
-                        <div className={`border-b px-4 py-3 flex items-center gap-3 transition-colors rounded-t-2xl ${currentSelection ? 'bg-indigo-50/40 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 transition-all ${currentSelection ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-400'}`}>
+                        <div className={`border-b px-6 py-4 flex items-center gap-4 transition-colors rounded-t-3xl ${currentSelection ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 transition-all ${currentSelection ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border-2 border-slate-200 text-slate-400'}`}>
                                 {index + 1}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h4 className={`text-xs font-bold uppercase tracking-wide truncate ${currentSelection ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                <h4 className={`text-sm font-black uppercase tracking-wider truncate ${currentSelection ? 'text-indigo-900' : 'text-slate-800'}`}>
                                     {msg.conflict.description}
                                 </h4>
                                 {msg.conflict.reasoning && (
-                                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium flex items-center gap-1">
-                                        <Info className="w-3 h-3" />
+                                    <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1.5 leading-tight italic">
+                                        <Info className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                                         {msg.conflict.reasoning}
                                     </p>
                                 )}
                             </div>
                         </div>
 
-                        {/* Comparison Grid */}
-                        <div className="p-4 space-y-6 relative">
-                            {/* Visual Flow Indicator */}
-                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center z-10 shadow-sm text-slate-300 group-hover:text-indigo-400 transition-colors">
-                                <ArrowDown className="w-4 h-4" />
+                        {/* Comparison Grid with High Visual Distinction */}
+                        <div className="p-6 space-y-10 relative">
+                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white border-4 border-slate-100 rounded-full flex items-center justify-center z-10 shadow-lg text-slate-300 group-hover:text-indigo-500 group-hover:border-indigo-100 transition-all duration-300 group-hover:scale-110">
+                                <SearchCode className="w-6 h-6" />
                             </div>
 
-                            {/* Section 1: Current Report (Legacy/Stable Look) */}
-                            <div className="space-y-2 relative">
-                                <div className="flex items-center gap-2 px-1">
-                                    <FileText className="w-3.5 h-3.5 text-slate-400" />
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                        {isRTL ? 'داده فعلی گزارش' : 'Current Report Text'}
-                                    </label>
+                            {/* Section 1: STABLE/EXISTING DATA */}
+                            <div className={`space-y-3 relative transition-all duration-300 ${currentSelection === 'kept_existing' ? 'opacity-100' : currentSelection ? 'opacity-30 blur-[0.5px]' : ''}`}>
+                                <div className="flex items-center justify-between px-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-slate-200 rounded-lg">
+                                            <Database className="w-3.5 h-3.5 text-slate-600" />
+                                        </div>
+                                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                            {isRTL ? 'داده‌های موجود' : 'Stable Data'}
+                                        </label>
+                                    </div>
+                                    <div className="px-2 py-0.5 bg-slate-200 text-[8px] font-black text-slate-500 rounded uppercase tracking-tighter">Established</div>
                                 </div>
-                                <div className="relative bg-slate-100/50 border-2 border-slate-200 border-solid rounded-xl p-4 text-xs text-slate-600 leading-relaxed shadow-inner font-medium">
-                                    <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:10px_10px]"></div>
-                                    "{msg.conflict.existing_info}"
+                                <div className="relative bg-slate-100 border-2 border-slate-300 border-solid rounded-2xl p-6 text-xs text-slate-700 leading-relaxed shadow-inner font-semibold font-mono min-h-[80px]">
+                                    <div className="absolute top-2 right-4 opacity-[0.05] pointer-events-none select-none">
+                                        <FileText className="w-16 h-16 text-slate-900" />
+                                    </div>
+                                    {msg.conflict.existing_info}
                                 </div>
                             </div>
 
-                            {/* Section 2: New Input (Fresh/Incoming Look) */}
-                            <div className="space-y-2 relative">
-                                <div className="flex items-center gap-2 px-1">
-                                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                                    <label className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
-                                        {isRTL ? 'ورودی پیشنهادی جدید' : 'Incoming New Data'}
-                                    </label>
+                            {/* Section 2: PROPOSED/NEW DATA */}
+                            <div className={`space-y-3 relative transition-all duration-300 ${currentSelection === 'updated_new' || currentSelection === 'combined' ? 'opacity-100' : currentSelection ? 'opacity-30 blur-[0.5px]' : ''}`}>
+                                <div className="flex items-center justify-between px-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-indigo-100 rounded-lg">
+                                            <Cpu className="w-3.5 h-3.5 text-indigo-500" />
+                                        </div>
+                                        <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                                            {isRTL ? 'داده‌های پیشنهادی هوش مصنوعی' : 'Proposed Data'}
+                                        </label>
+                                    </div>
+                                    <div className="px-2 py-0.5 bg-indigo-600 text-[8px] font-black text-white rounded shadow-sm uppercase tracking-tighter">New Logic</div>
                                 </div>
-                                <div className={`relative bg-indigo-50/40 border-2 border-dashed rounded-xl p-4 text-xs text-indigo-900 leading-relaxed shadow-sm transition-colors ${currentSelection === 'updated_new' || currentSelection === 'combined' ? 'border-indigo-400' : 'border-indigo-200'}`}>
-                                    <div className="absolute -top-2 -left-2 px-2 py-0.5 bg-indigo-500 text-[9px] text-white font-black rounded italic shadow-sm uppercase">NEW</div>
-                                    "{msg.conflict.new_info}"
+                                <div className={`relative bg-indigo-50 border-2 border-dashed rounded-2xl p-6 text-xs text-indigo-900 leading-relaxed shadow-[0_4px_15px_-5px_rgba(79,70,229,0.2)] transition-all duration-500 font-bold font-mono min-h-[80px] ${currentSelection === 'updated_new' || currentSelection === 'combined' ? 'border-indigo-500 bg-indigo-100/50' : 'border-indigo-300'}`}>
+                                    <div className="absolute top-2 right-4 opacity-[0.1] pointer-events-none select-none">
+                                        <Sparkles className="w-16 h-16 text-indigo-600" />
+                                    </div>
+                                    {msg.conflict.new_info}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Resolution Strategy Selector */}
-                        <div className="px-4 py-4 bg-slate-50/50 border-t border-slate-100 rounded-b-2xl grid grid-cols-3 gap-3">
+                        {/* Enhanced Resolution Strategy Selector */}
+                        <div className="px-6 py-6 bg-slate-50/50 border-t border-slate-100 rounded-b-3xl grid grid-cols-3 gap-5">
                             <button
                                 onClick={() => handleSelect(msg.id, 'kept_existing')}
-                                className={`group/btn flex flex-col items-center justify-center gap-2 py-3.5 rounded-xl border-2 transition-all duration-300 ${
+                                className={`group/btn flex flex-col items-center justify-center gap-2.5 py-4 rounded-2xl border-2 transition-all duration-300 ${
                                     currentSelection === 'kept_existing' 
-                                    ? 'bg-white border-slate-700 shadow-lg text-slate-900 ring-4 ring-slate-100 scale-[1.05] z-10' 
+                                    ? 'bg-white border-slate-900 shadow-xl text-slate-900 ring-4 ring-slate-100 scale-[1.05] z-10' 
                                     : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
                                 }`}
                             >
-                                <div className={`p-2 rounded-lg transition-colors ${currentSelection === 'kept_existing' ? 'bg-slate-800 text-white' : 'bg-slate-50 text-slate-300 group-hover/btn:bg-slate-100'}`}>
-                                    <Shield className="w-4.5 h-4.5" />
+                                <div className={`p-2.5 rounded-xl transition-colors ${currentSelection === 'kept_existing' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-300 group-hover/btn:bg-slate-200'}`}>
+                                    <Shield className="w-5 h-5" />
                                 </div>
                                 <div className="flex flex-col items-center">
-                                    <span className="text-[10px] font-black uppercase tracking-tight">{isRTL ? 'حفظ اصلی' : 'Keep Original'}</span>
-                                    <span className="text-[8px] opacity-60 font-medium">Reject change</span>
+                                    <span className="text-[10px] font-black uppercase tracking-tight">{isRTL ? 'حفظ اصلی' : 'Keep Existing'}</span>
+                                    <span className="text-[8px] opacity-60 font-medium">Verify Stability</span>
                                 </div>
                             </button>
                             
                             <button
                                 onClick={() => handleSelect(msg.id, 'combined')}
-                                className={`group/btn flex flex-col items-center justify-center gap-2 py-3.5 rounded-xl border-2 transition-all duration-300 ${
+                                className={`group/btn flex flex-col items-center justify-center gap-2.5 py-4 rounded-2xl border-2 transition-all duration-300 ${
                                     currentSelection === 'combined' 
-                                    ? 'bg-amber-50 border-amber-500 shadow-lg text-amber-900 ring-4 ring-amber-100 scale-[1.05] z-10' 
+                                    ? 'bg-amber-50 border-amber-500 shadow-xl text-amber-900 ring-4 ring-amber-100 scale-[1.05] z-10' 
                                     : 'bg-white border-slate-100 text-slate-400 hover:border-amber-200 hover:bg-amber-50/30'
                                 }`}
                             >
-                                <div className={`p-2 rounded-lg transition-colors ${currentSelection === 'combined' ? 'bg-amber-600 text-white' : 'bg-slate-50 text-slate-300 group-hover/btn:bg-amber-100/50'}`}>
-                                    <Layers className="w-4.5 h-4.5" />
+                                <div className={`p-2.5 rounded-xl transition-colors ${currentSelection === 'combined' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-100 text-slate-300 group-hover/btn:bg-amber-100/50'}`}>
+                                    <Layers className="w-5 h-5" />
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="text-[10px] font-black uppercase tracking-tight">{isRTL ? 'ترکیب هوشمند' : 'Synthesize'}</span>
-                                    <span className="text-[8px] opacity-60 font-medium">Merge both</span>
+                                    <span className="text-[8px] opacity-60 font-medium">Hybrid Approach</span>
                                 </div>
                             </button>
 
                             <button
                                 onClick={() => handleSelect(msg.id, 'updated_new')}
-                                className={`group/btn flex flex-col items-center justify-center gap-2 py-3.5 rounded-xl border-2 transition-all duration-300 ${
+                                className={`group/btn flex flex-col items-center justify-center gap-2.5 py-4 rounded-2xl border-2 transition-all duration-300 ${
                                     currentSelection === 'updated_new' 
-                                    ? 'bg-indigo-600 border-indigo-700 shadow-lg text-white ring-4 ring-indigo-100 scale-[1.05] z-10' 
+                                    ? 'bg-indigo-600 border-indigo-700 shadow-xl text-white ring-4 ring-indigo-100 scale-[1.05] z-10' 
                                     : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/30'
                                 }`}
                             >
-                                <div className={`p-2 rounded-lg transition-colors ${currentSelection === 'updated_new' ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-300 group-hover/btn:bg-indigo-100/50'}`}>
-                                    <RefreshCw className="w-4.5 h-4.5" />
+                                <div className={`p-2.5 rounded-xl transition-colors ${currentSelection === 'updated_new' ? 'bg-white text-indigo-600 shadow-lg' : 'bg-slate-100 text-slate-300 group-hover/btn:bg-indigo-100/50'}`}>
+                                    <RefreshCw className="w-5 h-5" />
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="text-[10px] font-black uppercase tracking-tight">{isRTL ? 'جایگزینی' : 'Overwrite'}</span>
-                                    <span className={`text-[8px] font-medium ${currentSelection === 'updated_new' ? 'text-indigo-100' : 'text-slate-400'}`}>Use new only</span>
+                                    <span className={`text-[8px] font-medium ${currentSelection === 'updated_new' ? 'text-indigo-100' : 'text-slate-400'}`}>Adopt Suggestion</span>
                                 </div>
                             </button>
                         </div>
@@ -212,34 +240,34 @@ const ConflictManager: React.FC<ConflictManagerProps> = ({ conflicts, onBulkReso
             })}
         </div>
 
-        {/* Global Action Footer */}
-        <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] sticky bottom-0 z-30">
+        {/* Action Footer */}
+        <div className="p-6 bg-white border-t border-slate-200 shadow-[0_-15px_45px_rgba(0,0,0,0.1)] sticky bottom-0 z-30">
             <button
                 onClick={handleFinalSubmit}
                 disabled={!isComplete || isSubmitting}
-                className={`group w-full relative overflow-hidden flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-sm transition-all duration-500 ${
+                className={`group w-full relative overflow-hidden flex items-center justify-center gap-3 py-4.5 rounded-2xl font-black text-sm transition-all duration-500 ${
                     isComplete && !isSubmitting
-                    ? 'bg-slate-900 text-white shadow-xl shadow-slate-200 hover:bg-black hover:-translate-y-0.5 active:translate-y-0' 
-                    : isSubmitting ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed border border-slate-200'
+                    ? 'bg-slate-900 text-white shadow-2xl shadow-indigo-200 hover:bg-black hover:-translate-y-1 active:translate-y-0' 
+                    : isSubmitting ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-300 cursor-not-allowed border border-slate-200'
                 }`}
             >
                 {isSubmitting ? (
                     <div className="flex items-center gap-3">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span className="animate-pulse">{isRTL ? 'در حال اعمال تغییرات...' : 'Updating Document...'}</span>
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <span className="animate-pulse tracking-wide">{isRTL ? 'در حال اعمال نتایج...' : 'Synchronizing Workspace...'}</span>
                     </div>
                 ) : (
                     <>
-                        <Save className={`w-5 h-5 transition-transform duration-500 ${isComplete ? 'group-hover:scale-110' : ''}`} />
-                        <span>{isRTL ? 'تایید و ثبت نهایی تمام موارد' : 'Confirm & Apply All Changes'}</span>
+                        <Save className={`w-5 h-5 transition-transform duration-500 ${isComplete ? 'group-hover:scale-125' : ''}`} />
+                        <span className="tracking-tight">{isRTL ? 'تایید و اعمال نهایی' : 'Finalize & Commit Changes'}</span>
                     </>
                 )}
             </button>
             {!isComplete && !isSubmitting && (
-                <div className="flex items-center justify-center gap-2 mt-3 animate-pulse">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">
-                        {isRTL ? 'لطفاً برای تمام موارد تصمیم‌گیری کنید' : 'Decisions required for all pending items'}
+                <div className="flex items-center justify-center gap-2 mt-4 animate-in slide-in-from-bottom-2 duration-500">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                        {isRTL ? 'تمام تضادها نیاز به بررسی دارند' : 'All conflicts require user decision'}
                     </p>
                 </div>
             )}

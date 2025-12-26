@@ -115,6 +115,7 @@ export const sendMessageToGemini = async (
     conflicts?: any[]; 
     newCitations?: string[];
     reportUpdates?: UpdateReportAction[];
+    usage?: any;
 }> => {
   // Always initialize right before use to ensure process.env.API_KEY is available and correct
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -197,7 +198,7 @@ ${userPrompt}
       .filter((web) => web !== undefined && web !== null)
       .map((web) => ({ title: web.title, uri: web.uri }));
 
-    return { text, sources, conflicts, newCitations, reportUpdates };
+    return { text, sources, conflicts, newCitations, reportUpdates, usage: response.usageMetadata };
   } catch (error) {
     console.error("Gemini API Error:", error);
     throw new Error("Failed to communicate with AI Assistant.");
@@ -207,18 +208,32 @@ ${userPrompt}
 export const generateCitation = async (
   source: string,
   style: 'APA' | 'IEEE' | 'MLA' = 'APA'
-): Promise<{ formatted: string; inText: string }> => {
+): Promise<{ formatted: string; inText: string; usage?: any }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Generate academic citation for: "${source}" style: ${style}. JSON: {formatted, inText}`;
+  const prompt = `Generate academic citation for: "${source}" style: ${style}. Return a JSON object with "formatted" and "inText" properties.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json" }
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            formatted: { type: Type.STRING },
+            inText: { type: Type.STRING },
+          },
+          required: ["formatted", "inText"],
+        }
+      }
     });
     const json = JSON.parse(response.text || "{}");
-    return { formatted: json.formatted || source, inText: json.inText || `[source]` };
+    return { 
+      formatted: json.formatted || source, 
+      inText: json.inText || `[source]`,
+      usage: response.usageMetadata
+    };
   } catch (error) {
     return { formatted: source, inText: `[?]` };
   }

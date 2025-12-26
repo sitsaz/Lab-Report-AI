@@ -1,16 +1,32 @@
+
 import React, { useState, useRef, useMemo } from 'react';
-import { Download, FilePenLine, Eye, Bold, Italic, List, Heading, Quote, Code, Split, Table as TableIcon, FileCode, ChevronDown, ClipboardCheck, CloudUpload, ExternalLink } from 'lucide-react';
+import { 
+  FilePenLine, 
+  Eye, 
+  Bold, 
+  Italic, 
+  List, 
+  Heading, 
+  Quote, 
+  Code, 
+  Split, 
+  Table as TableIcon, 
+  FileCode, 
+  ClipboardCheck, 
+  CloudUpload, 
+  Download, 
+  FileCheck
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { diffWords } from 'diff';
-import { copyForGoogleDocs } from '../services/document.ts';
+import { copyForGoogleDocs, saveTextToDocx } from '../services/document.ts';
 
 interface ReportEditorProps {
   content: string;
   originalContent?: string;
   onChange: (newContent: string) => void;
-  onDownload: () => void;
   fileName: string;
   language: 'en' | 'fa';
   onCursorChange?: (position: number) => void;
@@ -18,10 +34,10 @@ interface ReportEditorProps {
 
 type ViewMode = 'write' | 'preview' | 'split';
 
-const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, onChange, onDownload, fileName, language, onCursorChange }) => {
+const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, onChange, fileName, language, onCursorChange }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('write');
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [downloadFeedback, setDownloadFeedback] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isRTL = language === 'fa';
@@ -54,11 +70,16 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
     if (success) {
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 3000);
-      setIsExportMenuOpen(false);
       if (confirm(isRTL ? "متن با فرمت مناسب در حافظه کپی شد. آیا می‌خواهید یک سند جدید گوگل باز کنید؟" : "Formatted content copied! Would you like to open a new Google Doc to paste it?")) {
         window.open('https://docs.google.com/document/u/0/create', '_blank');
       }
     }
+  };
+
+  const handleDownloadDocx = async () => {
+    setDownloadFeedback(true);
+    await saveTextToDocx(content, fileName);
+    setTimeout(() => setDownloadFeedback(false), 3000);
   };
 
   const handleToolbarClick = (action: string) => {
@@ -113,11 +134,7 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
         newCursorPos = start + cbPre.length + 4 + (selection.length || 4);
         break;
       case 'table':
-        const rowsStr = window.prompt("Number of data rows:", "2");
-        if (rowsStr === null) return;
-        const colsStr = window.prompt("Number of columns:", "2");
-        if (colsStr === null) return;
-        const tableTemplate = `\n| Header | Header |\n| --- | --- |\n| Cell | Cell |\n`;
+        const tableTemplate = `\n| Variable | Measurement | Notes |\n| --- | --- | --- |\n| Temp | 24.5°C | Stable |\n| Pressure | 101.3 kPa | STP |\n`;
         const tblPre = start > 0 && text[start - 1] !== '\n' ? '\n' : '';
         newText = text.substring(0, start) + tblPre + tableTemplate + text.substring(end);
         newCursorPos = start + tblPre.length + tableTemplate.length;
@@ -155,7 +172,7 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
                 <div className="w-[1px] h-4 bg-slate-200 mx-1 flex-shrink-0"></div>
                 <ToolbarButton icon={<Code className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('code')} title="Inline Code" />
                 <ToolbarButton icon={<FileCode className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('codeblock')} title="Code Block" />
-                <ToolbarButton icon={<TableIcon className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('table')} title="Insert Table" />
+                <ToolbarButton icon={<TableIcon className="w-3.5 h-3.5" />} onClick={() => handleToolbarClick('table')} title="Insert Table Template" />
             </div>
         )}
 
@@ -167,63 +184,23 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
              </div>
              <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
              
-             {/* Export Dropdown */}
-             <div className="relative">
-                <div className="flex items-center">
-                    <button 
-                        onClick={onDownload}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-l-lg hover:bg-indigo-700 transition-colors shadow-sm border-r border-indigo-500"
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Export</span>
-                    </button>
-                    <button 
-                        onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                        className="px-1.5 py-1.5 bg-indigo-600 text-white rounded-r-lg hover:bg-indigo-700 transition-colors shadow-sm border-l border-indigo-500"
-                    >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-
-                {isExportMenuOpen && (
-                    <>
-                        <div className="fixed inset-0 z-20" onClick={() => setIsExportMenuOpen(false)}></div>
-                        <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1 overflow-hidden">
-                            <button 
-                                onClick={() => { onDownload(); setIsExportMenuOpen(false); }}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                                <Download className="w-4 h-4 text-slate-400" />
-                                <div className="flex flex-col">
-                                    <span className="font-semibold">Word (.docx)</span>
-                                    <span className="text-[10px] text-slate-400">Best for MS Word offline</span>
-                                </div>
-                            </button>
-                            <button 
-                                onClick={handleGoogleDocsExport}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-slate-700 hover:bg-indigo-50 transition-colors text-left group"
-                            >
-                                <CloudUpload className="w-4 h-4 text-blue-500" />
-                                <div className="flex flex-col">
-                                    <span className="font-semibold text-blue-600">Copy for Google Docs</span>
-                                    <span className="text-[10px] text-slate-400">Rich Text (pasted with styles)</span>
-                                </div>
-                                {copyFeedback && <ClipboardCheck className="w-4 h-4 text-green-500 ml-auto animate-bounce" />}
-                            </button>
-                            <div className="border-t border-slate-100 mt-1">
-                                <a 
-                                    href="https://docs.google.com/document/u/0/create" 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="w-full flex items-center gap-2 px-4 py-2 text-[10px] text-slate-400 hover:text-indigo-600 transition-colors"
-                                >
-                                    <ExternalLink className="w-3 h-3" />
-                                    Open New Google Doc
-                                </a>
-                            </div>
-                        </div>
-                    </>
-                )}
+             <div className="flex items-center gap-1.5">
+               <button 
+                  onClick={handleGoogleDocsExport}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg hover:bg-blue-700 transition-colors shadow-sm group"
+               >
+                  <CloudUpload className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">GDocs</span>
+                  {copyFeedback && <FileCheck className="w-3.5 h-3.5 text-green-300 ml-1 animate-bounce" />}
+               </button>
+               <button 
+                  onClick={handleDownloadDocx}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 text-white text-[10px] font-black uppercase rounded-lg hover:bg-black transition-colors shadow-sm group"
+                  disabled={downloadFeedback}
+               >
+                  <Download className={`w-3.5 h-3.5 ${downloadFeedback ? 'animate-bounce' : ''}`} />
+                  <span className="hidden lg:inline">MS Word (.doc)</span>
+               </button>
              </div>
         </div>
       </div>
@@ -270,7 +247,8 @@ const ReportEditor: React.FC<ReportEditorProps> = ({ content, originalContent, o
       <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center">
         <span>{viewMode === 'write' ? 'Markdown Editor' : viewMode === 'preview' ? 'Preview' : 'Split View'}</span>
         <div className="flex items-center gap-3">
-            {copyFeedback && <span className="text-green-600 font-bold animate-pulse">✓ Copied for GDocs</span>}
+            {copyFeedback && <span className="text-green-600 font-bold animate-pulse">✓ Ready for GDocs paste</span>}
+            {downloadFeedback && <span className="text-indigo-600 font-bold animate-pulse">Generating Document...</span>}
             <span className="font-mono">{content.length} chars</span>
         </div>
       </div>

@@ -1,7 +1,9 @@
+
 export interface Message {
   id: string;
   role: 'user' | 'model';
   text: string;
+  provider?: string;
   sources?: { title?: string; uri: string }[];
   conflict?: {
     existing_info: string;
@@ -39,4 +41,15 @@ export enum AppState {
   IDLE = 'IDLE',
   PROCESSING = 'PROCESSING',
   ERROR = 'ERROR'
+}
+
+export type AIProvider = 'gemini' | 'openai' | 'openrouter' | 'avalai';
+
+export interface UsageStats {
+  requestsInLastMinute: number;
+  totalRequests: number;
+  dailyRequestsCount: number;
+  totalTokens: number;
+  requestTimestamps: number[];
+  lastResetDate: string;
 }
